@@ -1,36 +1,223 @@
+<!DOCTYPE html>
 <html lang="en">
-<!-- feel free to revise this file -->
-
 <head>
-	<style>	
-		/*write your css rules here*/
-		
-		textarea {
-		  width:100%;
-		}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Priority Task List</title>
+  <style>
+    :root {
+      --red:    #e74c3c;
+      --black:  #2c3e50;
+      --grey:   #7f8c8d;
+      --done:   #95a5a6;
+    }
 
-		li {
-			font-size: 30px;
-		}
-		
-	</style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f6fa;
+      color: #2d3436;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3c50;
+      margin-bottom: 0.4em;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 14px;
+      font-size: 16px;
+      border: 2px solid #dfe6e9;
+      border-radius: 10px;
+      resize: vertical;
+      box-sizing: border-box;
+      background: white;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 3px rgba(52,152,219,0.2);
+    }
+
+    .buttons {
+      margin: 20px 0;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    button {
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #btn_add {
+      background: #27ae60;
+      color: white;
+    }
+    #btn_add:hover { background: #219653; }
+
+    #btn_toggle {
+      background: #7f8c8d;
+      color: white;
+    }
+    #btn_toggle:hover { background: #636e72; }
+
+    #btn_toggle.showing { background: #e67e22; }
+
+    ol#order_list {
+      list-style: none;
+      padding: 0;
+      margin: 20px 0 0;
+      counter-reset: task;
+    }
+
+    li.task {
+      background: white;
+      margin: 12px 0;
+      padding: 14px 18px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: all 0.25s;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    li.task:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    }
+
+    li.task.completed span {
+      text-decoration: line-through;
+      color: var(--done);
+      opacity: 0.75;
+    }
+
+    li.task.priority-1 span { color: var(--red);   font-weight: 600; }
+    li.task.priority-2 span { color: var(--black); font-weight: 500; }
+    li.task.priority-3 span { color: var(--grey);  font-weight: 400; }
+
+    li.task::before {
+      counter-increment: task;
+      content: counter(task) ".";
+      min-width: 36px;
+      font-weight: bold;
+      color: #636e72;
+      font-size: 1.15em;
+    }
+
+    .hide-completed .task.completed {
+      display: none;
+    }
+  </style>
 </head>
-
 <body>
-	<textarea id='text' rows="3" >Dinner, 1; Exercise, 2; Study, 3</textarea> 
-	<br/>
-	<div class='divButton'>
-		<button id='btn_add'>Add</button>
-		<button id='btn_hide'>Toggle</button>
-	</div>
 
-	<ol id='order_list'>
-	</ol>	
+  <h1>My Tasks</h1>
+
+  <textarea id="text" rows="4" placeholder="Task description, priority ; next task, priority">
+Dinner, 1; Exercise, 2; Study, 3
+  </textarea>
+
+  <div class="buttons">
+    <button id="btn_add">Add</button>
+    <button id="btn_toggle">Toggle Completed</button>
+  </div>
+
+  <ol id="order_list"></ol>
+
+  <script>
+    const textarea = document.getElementById('text');
+    const btnAdd    = document.getElementById('btn_add');
+    const btnToggle = document.getElementById('btn_toggle');
+    const list      = document.getElementById('order_list');
+
+    let hideCompleted = false;
+
+    function addTasksFromInput() {
+      const value = textarea.value.trim();
+      if (!value) return;
+
+      const entries = value.split(';')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      entries.forEach(entry => {
+        const [taskText, prioRaw] = entry.split(',').map(s => s.trim());
+        if (!taskText) return;
+
+        const priority = parseInt(prioRaw) || 2;
+        const prio = Math.max(1, Math.min(3, priority)); // clamp 1–3
+
+        const li = document.createElement('li');
+        li.className = `task priority-${prio}`;
+        li.innerHTML = `<span>${taskText}</span>`;
+
+        // Single click → toggle completed
+        li.addEventListener('click', function(e) {
+          if (e.detail === 1) {
+            this.classList.toggle('completed');
+            updateToggleButton();
+          }
+        });
+
+        // Double click → delete with confirmation
+        li.addEventListener('dblclick', function() {
+          if (confirm(`Delete this task?\n\n"${taskText}"`)) {
+            this.remove();
+            updateToggleButton();
+          }
+        });
+
+        list.appendChild(li);
+      });
+
+      textarea.value = ''; // clear input after adding
+      updateToggleButton();
+    }
+
+    function updateToggleButton() {
+      const hasAnyDone = list.querySelector('.completed') !== null;
+      btnToggle.disabled = !hasAnyDone;
+      btnToggle.textContent = hideCompleted ? "Show Completed" : "Hide Completed";
+      btnToggle.classList.toggle('showing', hideCompleted);
+    }
+
+    // Add tasks
+    btnAdd.addEventListener('click', addTasksFromInput);
+
+    // Press Enter (without Shift) to add
+    textarea.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        addTasksFromInput();
+      }
+    });
+
+    // Toggle completed tasks visibility
+    btnToggle.addEventListener('click', () => {
+      hideCompleted = !hideCompleted;
+      list.classList.toggle('hide-completed', hideCompleted);
+      updateToggleButton();
+    });
+
+    // Load example on start
+    addTasksFromInput();
+  </script>
 </body>
-
-	<script>
-		// write your Javascript here
-
-	</script>
 </html>
-
