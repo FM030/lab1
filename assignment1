@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Manager • Moja</title>
+  <style>
+    :root {
+      --red-priority:    #e53935;
+      --black-priority:  #333;
+      --grey-priority:   #888;
+      --done-color:      #aaa;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 680px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f8f9fa;
+      color: #222;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 0.6em;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 14px;
+      font-size: 16px;
+      border: 2px solid #dfe6e9;
+      border-radius: 10px;
+      resize: vertical;
+      box-sizing: border-box;
+      background: white;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #0984e3;
+      box-shadow: 0 0 0 3px rgba(9,132,227,0.15);
+    }
+
+    .buttons {
+      margin: 16px 0;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+
+    #btn_add {
+      background: #2ecc71;
+      color: white;
+    }
+
+    #btn_add:hover { background: #27ae60; }
+
+    #btn_toggle {
+      background: #636e72;
+      color: white;
+    }
+
+    #btn_toggle:hover { background: #485460; }
+
+    #btn_email {
+      background: #0984e3;
+      color: white;
+    }
+
+    #btn_email:hover { background: #0770c0; }
+
+    ol#task-list {
+      list-style: none;
+      padding: 0;
+      margin: 30px 0 0;
+      counter-reset: task-counter;
+    }
+
+    li.task-item {
+      padding: 14px 18px;
+      margin: 10px 0;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      user-select: none;
+      transition: all 0.22s;
+      cursor: pointer;
+    }
+
+    li.task-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+    }
+
+    li.task-item.completed {
+      opacity: 0.75;
+      background: #f5f6fa;
+    }
+
+    li.task-item.completed span {
+      text-decoration: line-through;
+      color: var(--done-color);
+    }
+
+    li.task-item.priority-1 span { color: var(--red-priority);   font-weight: 600; }
+    li.task-item.priority-2 span { color: var(--black-priority); font-weight: 500; }
+    li.task-item.priority-3 span { color: var(--grey-priority);  font-weight: 400; }
+
+    li.task-item::before {
+      counter-increment: task-counter;
+      content: counter(task-counter) ".";
+      min-width: 32px;
+      font-weight: bold;
+      color: #636e72;
+      font-size: 1.1em;
+    }
+
+    .hidden-completed {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Task Manager</h1>
+
+  <textarea id="input" rows="4" placeholder="e.g. Lecture preparation: cloud computing, 1; Dinner, 2; Walk dog, 3">Lecture preparation: cloud computing, 1; Dinner with Prof. Wong, 2; Walk my dog, 3; Lecture preparation: probability, 1</textarea>
+
+  <div class="buttons">
+    <button id="btn_add">ADD</button>
+    <button id="btn_toggle">TOGGLE COMPLETED</button>
+    <button id="btn_email">📧 EMAIL TASKS</button>
+  </div>
+
+  <ol id="task-list"></ol>
+
+  <script>
+    const input     = document.getElementById('input');
+    const btnAdd    = document.getElementById('btn_add');
+    const btnToggle = document.getElementById('btn_toggle');
+    const btnEmail  = document.getElementById('btn_email');
+    const list      = document.getElementById('task-list');
+
+    let hideCompleted = false;
+
+    function addTasks() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      const entries = text.split(';')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      entries.forEach(entry => {
+        const [taskPart, prioStr] = entry.split(',').map(s => s.trim());
+        if (!taskPart) return;
+
+        const priority = parseInt(prioStr) || 2;
+        const cleanPrio = Math.max(1, Math.min(3, priority)); // clamp 1–3
+
+        const li = document.createElement('li');
+        li.className = `task-item priority-${cleanPrio}`;
+        li.dataset.priority = cleanPrio;
+
+        const span = document.createElement('span');
+        span.textContent = taskPart;
+        li.appendChild(span);
+
+        // Single click → toggle complete
+        li.addEventListener('click', (e) => {
+          if (e.detail === 1) {  // single click
+            li.classList.toggle('completed');
+            updateToggleButtonState();
+          }
+        });
+
+        // Double click → delete with confirm (bonus)
+        li.addEventListener('dblclick', () => {
+          if (confirm(`Delete task:\n"${taskPart}" ?`)) {
+            li.remove();
+            updateToggleButtonState();
+          }
+        });
+
+        list.appendChild(li);
+      });
+
+      input.value = ''; // optional: clear after add
+      updateToggleButtonState();
+    }
+
+    function updateToggleButtonState() {
+      const hasCompleted = list.querySelectorAll('.completed').length > 0;
+      btnToggle.disabled = !hasCompleted;
+      btnToggle.textContent = hideCompleted ? "SHOW COMPLETED" : "HIDE COMPLETED";
+    }
+
+    // Add button
+    btnAdd.onclick = addTasks;
+
+    // Enter to add (without shift)
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        addTasks();
+      }
+    });
+
+    // Toggle completed visibility
+    btnToggle.onclick = () => {
+      hideCompleted = !hideCompleted;
+      list.classList.toggle('hide-completed-mode', hideCompleted);
+
+      document.querySelectorAll('.completed').forEach(el => {
+        el.classList.toggle('hidden-completed', hideCompleted);
+      });
+
+      updateToggleButtonState();
+    };
+
+    // Email tasks (very basic – opens mail client)  [bonus]
+    btnEmail.onclick = () => {
+      const tasks = Array.from(list.children)
+        .map(li => {
+          const prio = li.dataset.priority;
+          const text = li.querySelector('span').textContent;
+          const status = li.classList.contains('completed') ? '[DONE]' : '';
+          return `${prio}. ${text} ${status}`;
+        })
+        .join('\n');
+
+      if (!tasks.trim()) {
+        alert("No tasks to send.");
+        return;
+      }
+
+      const subject = "My Task List - " + new Date().toLocaleDateString();
+      const body = encodeURIComponent("Current tasks:\n\n" + tasks);
+      window.location.href = `mailto:yourname@example.com?subject=${encodeURIComponent(subject)}&body=${body}`;
+    };
+
+    // Initial load example
+    addTasks();
+  </script>
+</body>
+</html>
